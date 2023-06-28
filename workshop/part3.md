@@ -1,112 +1,34 @@
-### Step 3: Create our GRPC server with Tonic
+### Step 3: Adding some tests
 
-Now that we have played around with basic Rust functions, let's create something more interesting.
+Rust provides first-class support for testing through its built-in test framework. This is a significant advantage over TypeScript, where you would have to decide on a testing library yourself. In Rust, tests are written in the same files as the code and are run using **`cargo test`**.
 
-Let's start by adding Tonic and Tokio to our `Cargo.toml` dependencies:
+Let's add some tests for our **`calc::divide`** function. In Rust, tests are simply functions annotated with **`#[test]`**, and they go inside a **`#[cfg(test)] mod tests { ... }`** block in the same file. The **`#[cfg(test)]`** attribute tells Rust to compile and run the test code only when you run **`cargo test`**, not when you run **`cargo build`**.
 
-Run the following command :
-
-`cargo add prost tonic tokio -F tokio/rt-multi-thread -F tokio/macros && cargo add --build tonic-build` 
-
-You should now see the dependencies section of your `Cargo.toml` looking like this :
-
-```toml
-[dependencies]
-prost = "0.11.9"
-tokio = { version = "1.28.2", features = ["rt-multi-thread", "macros"] }
-tonic = "0.9.2"
-
-[build-dependencies]
-tonic-build = "0.9.2"
-```
-
-We'll be using `build.rs` to generate the code from our protobuf file (`hello_world.proto`).
-Create a `protos` directory, and add the following content to the `hello_world.proto` file.
-
-
-```protobuf
-syntax = "proto3";
-
-package hello_world;
-
-service Greeter {
-  rpc SayHello (HelloRequest) returns (HelloReply);
-}
-
-message HelloRequest {
-  string name = 1;
-}
-
-message HelloReply {
-  string message = 1;
-}
-```
-
-Create a `build.rs` in your project root (not in `src/`), and include this code to generate Rust from the proto:
+Go back to **`calc.rs`** and add the following code at the end of the file:
 
 ```rust
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::compile_protos("protos/hello_world.proto")?;
-    Ok(())
-}
-```
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-Now, we can create our server in `main.rs`:
+    #[test]
+    fn test_divide() {
+        assert_eq!(divide(10, 2).unwrap(), 5);
+    }
 
-```rust
-mod hello_world {
-    tonic::include_proto!("hello_world");
-}
-
-use hello_world::{greeter_server::{Greeter, GreeterServer}, HelloRequest, HelloReply};
-use tonic::{transport::Server, Request, Response, Status};
-
-pub struct MyGreeter;
-
-#[tonic::async_trait]
-impl Greeter for MyGreeter {
-    async fn say_hello(
-        &self,
-
-        request: Request<HelloRequest>,
-    ) -> Result<Response<HelloReply>, Status> {
-        let reply = hello_world::HelloReply {
-            message: format!("Hello {}!", request.into_inner().name),
-        };
-        Ok(Response::new(reply))
+    #[test]
+    fn test_divide_by_zero() {
+        assert!(divide(10, 0).is_err());
     }
 }
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "0.0.0.0:50051".parse()?;
-    let greeter = MyGreeter;
-
-    Server::builder()
-        .add_service(GreeterServer::new(greeter))
-        .serve(addr)
-        .await?;
-
-    Ok(())
-}
 ```
 
-Here we introduce Rust's Trait system with `impl Greeter for MyGreeter`. This allows us to define shared behavior; think of them like TypeScript interfaces but on steroids.
+Here, we're using **`assert_eq!`** to check that our function returns the correct result when dividing two numbers, and **`assert!`** to check that it correctly returns an error when trying to divide by zero. These are two of the most basic assertion macros that Rust provides for testing.
 
-You can now run your server with `cargo run` and try it out with the grpc client of your choice.
+You can run these tests with **`cargo test`**. Cargo automatically finds these tests and runs them, captures the output, and reports whether they passed or not.
 
-#### About `build.rs`
+Rust's testing framework also supports more advanced features, like setup functions (**`#[test_case]`**), ignored tests (**`#[ignore]`**), and custom assertion messages, but these basics should be enough to get you started.
 
-In Rust, **`build.rs`** is a special file that's part of the build process. This file is executed by Cargo before your package is built, which makes it a powerful tool to handle any pre-build steps.
+Testing is an integral part of Rust's philosophy of reliability. It complements the type system and ownership model by catching logic errors at development time, before they can turn into runtime errors. And as we've seen, it's convenient and straightforward to use. You can write tests as soon as you've written your functions, run them at any time with a single command, and trust that if they pass, your code is correct.
 
-In this workshop, we're using **`build.rs`** to compile our Protocol Buffers into Rust code. The **`tonic_build::compile_protos`** function call takes care of this. It reads the **`.proto`** files and generates the corresponding Rust code, which we can then use in our application.
-
-Compared to TypeScript, Rust's **`build.rs`** can be seen as a more integrated and powerful version of the "scripts" section in **`package.json`**. However, it's more than just a place to put scripts. It's a fully-fledged Rust program, meaning you can use all of Rust's features, libraries, and error handling capabilities to define your build process.
-
-Think about how you would set up a TypeScript project to work with Protocol Buffers. You'd have to install a Protocol Buffers compiler, write scripts to call it on your **`.proto`** files, potentially write more scripts to move the generated code to the correct location, and so on. It's a lot of manual work and boilerplate code.
-
-With Rust's **`build.rs`**, all that complexity is abstracted away. You write a few lines of Rust code, and you get a robust, reliable, and efficient build process that integrates seamlessly with the rest of your Rust toolchain.
-
-This is just one example of how Rust's design, focusing on zero-cost abstractions and toolchain integration, can make complex tasks simpler and more enjoyable.
-
-[Now let's make our program a little bit more useful !](./part4.md)
+Now let's [add our GRPC server](./part4.md).

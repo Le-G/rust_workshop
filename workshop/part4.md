@@ -1,201 +1,89 @@
-### Implement UserService and UserRepository
+### Step 4: Create a GRPC server with Tonic
 
-#### Add the new proto
-Now that you have a running gRPC server, it's time to add more functionality to it.
+Now that we have played around with basic Rust functions, let's create something more interesting.
 
-First, let's create the `user.proto` file in the `protos` directory with the following content to reflect the new UserService.
+Let's start by adding Tonic and Tokio to our `Cargo.toml` dependencies:
+
+Run the following command :
+
+`cargo add prost tonic tokio -F tokio/rt-multi-thread -F tokio/macros && cargo add --build tonic-build` 
+
+You should now see the dependencies section of your `Cargo.toml` looking like this :
+
+```toml
+[dependencies]
+prost = "0.11.9"
+tokio = { version = "1.28.2", features = ["rt-multi-thread", "macros"] }
+tonic = "0.9.2"
+
+[build-dependencies]
+tonic-build = "0.9.2"
+```
+
+We'll be using `build.rs` to generate the code from our protobuf file (`hello_world.proto`).
+Create a `protos` directory, and add the following content to the `hello_world.proto` file.
+
 
 ```protobuf
 syntax = "proto3";
 
-package user;
+package hello_world;
 
-service UserService {
-  rpc Signup(SignupRequest) returns (SignupResponse) {}
-  rpc Login(LoginRequest) returns (LoginResponse) {}
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply);
 }
 
-message SignupRequest {
-  string username = 1;
-  string email = 2;
-  string password = 3;
+message HelloRequest {
+  string name = 1;
 }
 
-message SignupResponse {
-  string user_id = 1;
-}
-
-message LoginRequest {
-  string username = 1;
-  string password = 2;
-}
-
-message LoginResponse {
-  string token = 1;
+message HelloReply {
+  string message = 1;
 }
 ```
 
-This defines two RPCs, `Signup` and `Login`. `Signup` will take a `SignupRequest` containing a username, email, and password, and will return a `SignupResponse` containing the new user's id. `Login` will take a `LoginRequest` with a username and password and will return a `LoginResponse` with a token.
-
-In build.rs, replace `hello_world.proto` by `user.proto`.
-
-#### Add dependencies 
-
-Now it’s time to add a firestore client and a serialization library with the following command :
-
-`cargo add firestore serde`
-
-#### Add the user entity
-
-Create a new `user.rs` file with the following content :
+Create a `build.rs` in your project root (not in `src/`), and include this code to generate Rust from the proto:
 
 ```rust
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct User {
-    #[serde(alias = "_firestore_id")]
-    pub id: Option<String>,
-    pub username: String,
-    pub email: String,
-    pub password: String,
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tonic_build::compile_protos("protos/hello_world.proto")?;
+    Ok(())
 }
-
 ```
 
-#### Add the user repository
-
-Now create a `user_repository.rs` file.
+Now, we can create our server in `main.rs`:
 
 ```rust
-use firestore::FirestoreDb;
-
-static COLLECTION_NAME: &str = "users";
-
-// The UserRepository struct will serve as the repository layer for accessing Firestore
-pub struct UserRepository {
-    db: FirestoreDb,
+mod hello_world {
+    tonic::include_proto!("hello_world");
 }
 
-impl UserRepository {
-    pub fn new(db: FirestoreDb) -> Self {
-        Self { db }
-    }
+use hello_world::{greeter_server::{Greeter, GreeterServer}, HelloRequest, HelloReply};
+use tonic::{transport::Server, Request, Response, Status};
 
-    // Define the methods for accessing Firestore here
-    pub async fn signup(
-        &self,
-        username: String,
-        email: String,
-        password: String,
-    ) -> Result<String, FirestoreError> {
-        // Add your Firestore operations here
-        Ok(String("ok"))
-    }
-
-    pub async fn login(
-        &self,
-        username: String,
-        password: String,
-    ) -> Result<Option<String>, FirestoreError> {
-        // Add your Firestore operations here
-        Ok(Some(String("my_token")))
-    }
-}
-
-```
-
-Here we are defining a `UserRepository` struct which will be used for Firestore operations, and two methods `signup` and `login` for the respective operations.
-
-#### Creating the service
-
-We can now create our GRPC service in a `user_service.rs` file.
-
-```rust
-use crate::{
-    user_grpc_service::{
-        user_service_server::UserService, LoginRequest, LoginResponse, SignupRequest,
-        SignupResponse,
-    },
-    user_repository::UserRepository,
-};
-use firestore::FirestoreDb;
-use tonic::{Request, Response, Status};
-
-pub struct MyUserService {
-    db: FirestoreDb,
-}
-
-impl MyUserService {
-    pub fn new(db: FirestoreDb) -> Self {
-        Self { db }
-    }
-}
+pub struct MyGreeter;
 
 #[tonic::async_trait]
-impl UserService for MyUserService {
-    async fn signup(
+impl Greeter for MyGreeter {
+    async fn say_hello(
         &self,
-        request: Request<SignupRequest>,
-    ) -> Result<Response<SignupResponse>, Status> {
-        let payload = request.get_ref();
-        let repo = UserRepository::new(self.db.clone());
-        let signup_result = repo
-            .signup(
-                payload.username.clone(),
-                payload.email.clone(),
-                payload.password.clone(),
-            )
-            .await
 
-        // Use match on signup_result to return the appropriate grpc response.
-    }
-
-    async fn login(
-        &self,
-        request: Request<LoginRequest>,
-    ) -> Result<Response<LoginResponse>, Status> {
-        let payload = request.get_ref();
-        let repo = UserRepository::new(self.db.clone());
-        let login_result = repo
-            .login(payload.username.clone(), payload.password.clone())
-            .await;
-
-        //Use match on login_result to return the appropriate grpc response.
+        request: Request<HelloRequest>,
+    ) -> Result<Response<HelloReply>, Status> {
+        let reply = hello_world::HelloReply {
+            message: format!("Hello {}!", request.into_inner().name),
+        };
+        Ok(Response::new(reply))
     }
 }
-
-```
-
-Now, update the main function to include the Firestore client and pass it through to the UserService.
-
-```rust
-mod user_grpc_service {
-    tonic::include_proto!("user");
-}
-
-use std::env;
-
-use firestore::FirestoreDb;
-use tonic::transport::Server;
-use user_grpc_service::user_service_server::UserServiceServer;
-use user_service::MyUserService;
-
-mod user;
-mod user_repository;
-mod user_service;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Create an instance
-    let db = FirestoreDb::new(&env::var("PROJECT_ID").unwrap()).await?;
-
-    let addr = "0.0.0.0:50051".parse().unwrap();
-    let user_service = UserServiceServer::new(MyUserService::new(db.clone()));
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let addr = "0.0.0.0:50051".parse()?;
+    let greeter = MyGreeter;
 
     Server::builder()
-        .add_service(user_service)
+        .add_service(GreeterServer::new(greeter))
         .serve(addr)
         .await?;
 
@@ -203,6 +91,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 ```
 
-As you may have noticed, the results coming from the repository are not properly handled in the service. Use `match` to handle all the cases to return the expected grpc response.
+Here we introduce Rust's Trait system with `impl Greeter for MyGreeter`. This allows us to define shared behavior; think of them like TypeScript interfaces but on steroids.
 
-When this is done and that your code compiles, you can move to the [final part](./part5.md) !
+You can now run your server with `cargo run` and try it out with the grpc client of your choice.
+
+#### About `build.rs`
+
+In Rust, **`build.rs`** is a special file that's part of the build process. This file is executed by Cargo before your package is built, which makes it a powerful tool to handle any pre-build steps.
+
+In this workshop, we're using **`build.rs`** to compile our Protocol Buffers into Rust code. The **`tonic_build::compile_protos`** function call takes care of this. It reads the **`.proto`** files and generates the corresponding Rust code, which we can then use in our application.
+
+Compared to TypeScript, Rust's **`build.rs`** can be seen as a more integrated and powerful version of the "scripts" section in **`package.json`**. However, it's more than just a place to put scripts. It's a fully-fledged Rust program, meaning you can use all of Rust's features, libraries, and error handling capabilities to define your build process.
+
+Think about how you would set up a TypeScript project to work with Protocol Buffers. You'd have to install a Protocol Buffers compiler, write scripts to call it on your **`.proto`** files, potentially write more scripts to move the generated code to the correct location, and so on. It's a lot of manual work and boilerplate code.
+
+With Rust's **`build.rs`**, all that complexity is abstracted away. You write a few lines of Rust code, and you get a robust, reliable, and efficient build process that integrates seamlessly with the rest of your Rust toolchain.
+
+This is just one example of how Rust's design, focusing on zero-cost abstractions and toolchain integration, can make complex tasks simpler and more enjoyable.
+
+[Now let's make our program a little bit more useful !](./part5.md)
