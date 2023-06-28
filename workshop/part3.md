@@ -1,5 +1,7 @@
 ### Step 3: Create our GRPC server with Tonic
 
+Now that we have played around with basic Rust functions, let's create something more interesting.
+
 Let's start by adding Tonic and Tokio to our `Cargo.toml` dependencies:
 
 Run the following command :
