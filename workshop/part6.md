@@ -2,8 +2,10 @@
 
 #### Signup
 
-Let's now replace our dummy repository logic by actual queries.
-To run your program with the emulator, make sure to have `FIRESTORE_EMULATOR_HOST` defined like so : `FIRESTORE_EMULATOR_HOST="localhost:4510" PROJECT_ID=omelettedufromage cargo run`.
+Let's now replace our dummy repository logic by actual queries. To run your
+program with the emulator, make sure to have `FIRESTORE_EMULATOR_HOST` defined
+like so :
+`FIRESTORE_EMULATOR_HOST="localhost:4510" PROJECT_ID=omelettedufromage cargo run`.
 
 A naive version of our `signup` function would look a little bit like this :
 
@@ -38,11 +40,15 @@ A naive version of our `signup` function would look a little bit like this :
     }
 ```
 
-Note that thanks to the firestore library, and the serde annotation we used earlier, the `id` field of our struct is automatically filled when we insert the document.
+Note that thanks to the firestore library, and the serde annotation we used
+earlier, the `id` field of our struct is automatically filled when we insert the
+document.
 
 #### Login
 
-You may have noticed that the return type of login is a little bit more complex that signup. This is because it handles both technical errors, but also possible user mistakes.
+You may have noticed that the return type of login is a little bit more complex
+that signup. This is because it handles both technical errors, but also possible
+user mistakes.
 
 A possible implementation could be the following :
 
@@ -80,4 +86,5 @@ A possible implementation could be the following :
 
 Now run your program and try it out !
 
-If you wish to see the completed workshop, the code is available on the `completed_code` branch of this repository.
+If you wish to see the completed workshop, the code is available on the
+`completed_code` branch of this repository.

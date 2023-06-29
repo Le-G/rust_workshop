@@ -1,9 +1,12 @@
 ### Implement UserService and UserRepository
 
 #### Add the new proto
-Now that you have a running gRPC server, it's time to add more functionality to it.
 
-First, let's create the `user.proto` file in the `protos` directory with the following content to reflect the new UserService.
+Now that you have a running gRPC server, it's time to add more functionality to
+it.
+
+First, let's create the `user.proto` file in the `protos` directory with the
+following content to reflect the new UserService.
 
 ```protobuf
 syntax = "proto3";
@@ -35,13 +38,18 @@ message LoginResponse {
 }
 ```
 
-This defines two RPCs, `Signup` and `Login`. `Signup` will take a `SignupRequest` containing a username, email, and password, and will return a `SignupResponse` containing the new user's id. `Login` will take a `LoginRequest` with a username and password and will return a `LoginResponse` with a token.
+This defines two RPCs, `Signup` and `Login`. `Signup` will take a
+`SignupRequest` containing a username, email, and password, and will return a
+`SignupResponse` containing the new user's id. `Login` will take a
+`LoginRequest` with a username and password and will return a `LoginResponse`
+with a token.
 
 In build.rs, replace `hello_world.proto` by `user.proto`.
 
-#### Add dependencies 
+#### Add dependencies
 
-Now it’s time to add a firestore client and a serialization library with the following command :
+Now it’s time to add a firestore client and a serialization library with the
+following command :
 
 `cargo add firestore serde`
 
@@ -61,7 +69,6 @@ pub struct User {
     pub email: String,
     pub password: String,
 }
-
 ```
 
 #### Add the user repository
@@ -69,7 +76,7 @@ pub struct User {
 Now create a `user_repository.rs` file.
 
 ```rust
-use firestore::FirestoreDb;
+use firestore::{errors:FirestoreError, FirestoreDb};
 
 static COLLECTION_NAME: &str = "users";
 
@@ -91,7 +98,7 @@ impl UserRepository {
         password: String,
     ) -> Result<String, FirestoreError> {
         // Add your Firestore operations here
-        Ok(String("ok"))
+        Ok("ok".to_string())
     }
 
     pub async fn login(
@@ -100,13 +107,13 @@ impl UserRepository {
         password: String,
     ) -> Result<Option<String>, FirestoreError> {
         // Add your Firestore operations here
-        Ok(Some(String("my_token")))
+        Ok(Some("my_token".to_string()))
     }
 }
-
 ```
 
-Here we are defining a `UserRepository` struct which will be used for Firestore operations, and two methods `signup` and `login` for the respective operations.
+Here we are defining a `UserRepository` struct which will be used for Firestore
+operations, and two methods `signup` and `login` for the respective operations.
 
 #### Creating the service
 
@@ -147,7 +154,7 @@ impl UserService for MyUserService {
                 payload.email.clone(),
                 payload.password.clone(),
             )
-            .await
+            .await;
 
         // Use match on signup_result to return the appropriate grpc response.
     }
@@ -165,10 +172,10 @@ impl UserService for MyUserService {
         //Use match on login_result to return the appropriate grpc response.
     }
 }
-
 ```
 
-Now, update the main function to include the Firestore client and pass it through to the UserService.
+Now, update the main function to include the Firestore client and pass it
+through to the UserService.
 
 ```rust
 mod user_grpc_service {
@@ -203,6 +210,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 ```
 
-As you may have noticed, the results coming from the repository are not properly handled in the service. Use `match` to handle all the cases to return the expected grpc response.
+As you may have noticed, the results coming from the repository are not properly
+handled in the service. Use `match` to handle all the cases to return the
+expected grpc response.
 
-When this is done and that your code compiles, you can move to the [final part](./part6.md) !
+When this is done and that your code compiles, you can move to the
+[final part](./part6.md) !
